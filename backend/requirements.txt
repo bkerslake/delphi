@@ -1,0 +1,7 @@
+flask==3.0.2
+flask-cors==4.0.0
+requests==2.32.3
+python-dotenv==1.0.1
+groq==0.24.0
+exa_py==1.0.6
+ip2geotools==0.1.6
