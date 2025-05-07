@@ -17,7 +17,7 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState(false);
-  const backendUrl = process.env.BACKEND_URL || 'http://localhost:8000';
+  const backendUrl = process.env.BACKEND_URL;
 
   const callEnrich = async (url?: string) => {
     setLoading(true);
