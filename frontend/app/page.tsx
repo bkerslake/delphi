@@ -17,7 +17,7 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState(false);
-  const NEXT_PUBLIC_BACKEND_URL = "delphi.railway.internal";
+  const NEXT_PUBLIC_BACKEND_URL = "https://delphi.railway.internal";
 
   const callEnrich = async (url?: string) => {
     setLoading(true);
