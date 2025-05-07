@@ -11,7 +11,7 @@ import re
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app, supports_credentials=True, resources={r"/api/*": {"origins": "http://localhost:3000"}})
+CORS(app, supports_credentials=True, resources={r"/api/*": {"origins": ["http://localhost:3000", "https://gentle-elegance-production.up.railway.app"]}})
 
 # API keys
 MIXRANK_API_KEY = os.getenv('MIXRANK_API_KEY')
