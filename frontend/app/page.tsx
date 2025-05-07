@@ -17,7 +17,7 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState(false);
-  const backendUrl = process.env.BACKEND_URL;
+  const NEXT_PUBLIC_BACKEND_URL = process.env.BACKEND_URL;
 
   const callEnrich = async (url?: string) => {
     setLoading(true);
@@ -27,7 +27,7 @@ export default function Home() {
       const payload: any = { name };
       if (url) payload.social_url = url;
 
-      const response = await fetch(`${backendUrl}/api/enrich`, {
+      const response = await fetch(`${NEXT_PUBLIC_BACKEND_URL}/api/enrich`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -65,7 +65,7 @@ export default function Home() {
     setCandidates([]);
     
     try {
-      const response = await fetch(`${backendUrl}/api/full_profile`, {
+      const response = await fetch(`${NEXT_PUBLIC_BACKEND_URL}/api/full_profile`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
