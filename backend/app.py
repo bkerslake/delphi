@@ -54,7 +54,6 @@ class ConfirmProfileRequest(BaseModel):
 exa = Exa(EXA_API_KEY)
 openai.api_key = OPENAI_API_KEY
 client = openai.AsyncOpenAI()
-secondary_client = openai.AsyncOpenAI()
 
 # Helpers
 
@@ -160,6 +159,24 @@ async def enrich(body: EnrichRequest, request: Request):
         'candidates': [c.dict() for c in candidates],
         'location': location_info['display']
     }
+
+# Quick Summary
+async def get_quick_summary(data):
+    system_prompt = f"""
+    You are given a JSON object of a person's LinkedIn profile. Create a brief summary of the person's background and bio. Don't include any fancy formatting.
+    """
+    user_prompt = f"""
+    {data.json()}
+    """
+    summary = await client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}],
+    )
+    try:
+        summary = summary.choices[0].message.content
+        return summary
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Failed to generate summary")
     
 # Once a user confirms a profile, we can enrich them directly
 # Automated guessing :)
@@ -197,9 +214,7 @@ async def full_profile(request: FullProfileRequest):
     raw = resp.choices[0].message.content
     match_url = re.search(r"https?://[\w./%-]+", raw)
     social_url = match_url.group(0) if match_url else None
-
     if not social_url or "linkedin.com/in/" not in social_url.lower():
-        print("Issue with social_url", social_url)
         raise HTTPException(status_code=500, detail="Failed to generate LinkedIn URL, but it's not you–it's us. Please try again!")
 
     # Enrich via Mixrank
@@ -212,7 +227,10 @@ async def full_profile(request: FullProfileRequest):
         )
     if mix_resp.status_code != 200:
         raise HTTPException(status_code=500, detail="Mixrank enrichment failed")
-    return mix_resp.json()
+    summary = await get_quick_summary(mix_resp)
+    return {
+        "summary": summary
+    }
 
 # If a user gives us their linkedin url, we can enrich them directly
 @app.post('/api/confirm_profile')
@@ -231,7 +249,11 @@ async def confirm_profile(request: ConfirmProfileRequest):
         )
     if mix_resp.status_code != 200:
         raise HTTPException(status_code=500, detail="Mixrank enrichment failed")
-    return mix_resp.json()
+    # create a summary of the data with gpt-4o-mini
+    summary = await get_quick_summary(mix_resp)
+    return {
+        "summary": summary
+    }
     
         
         
