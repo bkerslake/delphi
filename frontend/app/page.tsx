@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import ProfileCard from '../components/ProfileCard';
 
 interface Candidate {
   summary: string;
@@ -9,25 +8,32 @@ interface Candidate {
   score?: number;
 }
 
+type ManualMode = 'enrich' | 'confirm' | null;
+
 export default function Home() {
   const [name, setName] = useState('');
   const [socialUrl, setSocialUrl] = useState('');
   const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [location, setLocation] = useState<string>('');
+  const [requireUrl, setRequireUrl] = useState(false);
+  const [manualMode, setManualMode] = useState<ManualMode>(null);
+  const [urlMessage, setUrlMessage] = useState<string>('');
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState(false);
-  const NEXT_PUBLIC_BACKEND_URL = "https://delphi-production.up.railway.app";
+  const backendUrl = 'http://localhost:8000';
 
   const callEnrich = async (url?: string) => {
     setLoading(true);
     setError(null);
-
+    setRequireUrl(false);
+    setManualMode(null);
     try {
       const payload: any = { name };
       if (url) payload.social_url = url;
 
-      const response = await fetch(`${NEXT_PUBLIC_BACKEND_URL}/api/enrich`, {
+      const response = await fetch(`${backendUrl}/api/enrich`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -37,13 +43,39 @@ export default function Home() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Enrichment failed');
 
-      if (data.candidates) {
-        // Disambiguation phase
+      if (data.require_social_url) {
+        setRequireUrl(true);
+        setManualMode('enrich');
+        setUrlMessage(data.message || 'Please provide a social URL');
+        if (data.location) setLocation(data.location);
+      } else if (data.candidates) {
+        setLocation(data.location || '');
         setCandidates(data.candidates);
       } else {
-        // Final enrichment phase
-        setProfile(data);
+        setError('Unexpected response from server');
       }
+    } catch (err: any) {
+      setError(err.message || 'An error occurred');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const callConfirmProfile = async (linkedinUrl: string) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch(`${backendUrl}/api/confirm_profile`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, linkedin_url: linkedinUrl }),
+        credentials: 'include',
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Confirmation failed');
+
+      setProfile(data);
     } catch (err: any) {
       setError(err.message || 'An error occurred');
     } finally {
@@ -56,6 +88,7 @@ export default function Home() {
     setCandidates([]);
     setProfile(null);
     setConfirmed(false);
+    setError(null);
     callEnrich();
   };
 
@@ -63,16 +96,12 @@ export default function Home() {
     setLoading(true);
     setError(null);
     setCandidates([]);
-    
+
     try {
-      const response = await fetch(`${NEXT_PUBLIC_BACKEND_URL}/api/full_profile`, {
+      const response = await fetch(`${backendUrl}/api/full_profile`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name,
-          summary: candidate.summary,
-          url: candidate.url
-        }),
+        body: JSON.stringify({ name, summary: candidate.summary, url: candidate.url }),
         credentials: 'include',
       });
 
@@ -82,12 +111,21 @@ export default function Home() {
       setProfile(data);
     } catch (err: any) {
       setError(err.message || 'An error occurred');
-      // Reset to initial state on error
       setCandidates([]);
       setSocialUrl('');
       setProfile(null);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSubmitUrl = () => {
+    if (socialUrl) {
+      if (manualMode === 'enrich') {
+        callEnrich(socialUrl);
+      } else if (manualMode === 'confirm') {
+        callConfirmProfile(socialUrl);
+      }
     }
   };
 
@@ -97,31 +135,45 @@ export default function Home() {
     // TODO: persist confirmed profile to backend
   };
 
-  const handleReject = () => {
-    // reset to initial state
+  const handleNoneOfThese = () => {
+    // ask for manual LinkedIn URL to confirm
+    setManualMode('confirm');
+    setRequireUrl(true);
+    setUrlMessage('None matched. Please provide your LinkedIn profile URL to confirm.');
     setCandidates([]);
-    setSocialUrl('');
-    setProfile(null);
+  };
+
+  const handleRestart = () => {
     setName('');
+    setSocialUrl('');
+    setCandidates([]);
+    setLocation('');
+    setRequireUrl(false);
+    setManualMode(null);
+    setUrlMessage('');
+    setProfile(null);
+    setError(null);
+    setConfirmed(false);
+    setLoading(false);
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 py-6 flex flex-col justify-center sm:py-12">
+    <div className="min-h-screen bg-gray-100 dark:bg-gray-900 py-6 flex flex-col justify-center sm:py-12">
       <div className="relative py-3 sm:max-w-xl sm:mx-auto">
-        <div className="relative px-4 py-10 bg-white mx-8 md:mx-0 shadow rounded-3xl sm:p-10">
+        <div className="relative px-4 py-10 bg-white dark:bg-gray-800 mx-8 md:mx-0 shadow rounded-3xl sm:p-10">
           <div className="max-w-md mx-auto">
-            <h1 className="text-2xl font-bold mb-8 text-center">Profile Enrichment</h1>
+            <h1 className="text-2xl font-bold mb-8 text-center text-gray-900 dark:text-white">Delphi Enrichment</h1>
 
             {/* Entry Form */}
-            {!candidates.length && !profile && !confirmed && (
+            {!candidates.length && !profile && !confirmed && !requireUrl && (
               <form onSubmit={handleEnrich} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Full Name</label>
+                  <label className="block text-sm font-medium text-gray-900 dark:text-white">Full Name</label>
                   <input
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-gray-900 dark:text-white bg-white dark:bg-gray-700"
                     required
                   />
                 </div>
@@ -135,13 +187,43 @@ export default function Home() {
               </form>
             )}
 
+            {/* Require URL / Manual Confirm */}
+            {requireUrl && !profile && (
+              <div className="space-y-4">
+                <p className="text-center text-gray-700">{urlMessage}</p>
+                <input
+                  type="url"
+                  placeholder="https://linkedin.com/in/..."
+                  value={socialUrl}
+                  onChange={(e) => setSocialUrl(e.target.value)}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-gray-900 dark:text-white bg-white dark:bg-gray-700"
+                />
+                <button
+                  onClick={handleSubmitUrl}
+                  disabled={loading || !socialUrl}
+                  className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
+                >
+                  {loading
+                    ? (manualMode === 'confirm' ? 'Confirming...' : 'Enriching...')
+                    : (manualMode === 'confirm' ? 'Confirm URL' : 'Submit URL')}
+                </button>
+                <button
+                  onClick={handleRestart}
+                  className="w-full bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
+                >
+                  Start Over
+                </button>
+              </div>
+            )}
+
             {/* Error Display */}
             {error && <div className="text-red-500 text-center mt-4">{error}</div>}
 
             {/* Candidate Selection */}
             {candidates.length > 0 && (
               <div className="space-y-4">
-                <h2 className="text-xl font-semibold">Select Your Profile</h2>
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Select Your Profile</h2>
+                <p className="text-sm text-gray-700 dark:text-gray-300">Location: {location}</p>
                 <ul className="divide-y divide-gray-200">
                   {candidates.map((cand, idx) => (
                     <li key={idx} className="py-2 flex justify-between items-center">
@@ -156,7 +238,7 @@ export default function Home() {
                   ))}
                 </ul>
                 <button
-                  onClick={handleReject}
+                  onClick={handleNoneOfThese}
                   className="mt-4 w-full bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
                 >
                   None of These
@@ -167,8 +249,8 @@ export default function Home() {
             {/* Profile JSON Display */}
             {profile && !confirmed && (
               <div className="bg-white rounded-lg shadow p-6 space-y-4">
-                <h2 className="text-xl font-semibold">Full Profile Data</h2>
-                <pre className="bg-gray-50 p-4 rounded-lg overflow-auto max-h-96 text-sm">
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Full Profile Data</h2>
+                <pre className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg overflow-auto max-h-96 text-sm">
                   {JSON.stringify(profile, null, 2)}
                 </pre>
                 <div className="flex space-x-4 pt-4">
@@ -191,9 +273,9 @@ export default function Home() {
             {/* Confirmation Message */}
             {confirmed && (
               <div className="text-center">
-                <h2 className="text-xl font-bold text-green-600 mb-4">Profile Confirmed!</h2>
+                <h2 className="text-xl font-bold text-green-700 dark:text-green-400 mb-4">Profile Confirmed!</h2>
                 <button
-                  onClick={handleReject}
+                  onClick={handleRestart}
                   className="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700"
                 >
                   Start Over
