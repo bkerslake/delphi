@@ -170,7 +170,6 @@ async def full_profile(request: FullProfileRequest):
         raise HTTPException(status_code=400, detail="Name is required")
     if not summary or not url:
         raise HTTPException(status_code=400, detail="Summary and URL are required")
-    print(name, summary, url)
     system_prompt = f"""
     You are given:
     - The full name being searched for
@@ -194,10 +193,8 @@ async def full_profile(request: FullProfileRequest):
                 messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}],
         )
     except Exception as e:
-        print("error", e)
         raise HTTPException(status_code=500, detail="Failed to generate LinkedIn URL, but it's not you–it's us. Please try again!")
     raw = resp.choices[0].message.content
-    print("raw", raw)
     match_url = re.search(r"https?://[\w./%-]+", raw)
     social_url = match_url.group(0) if match_url else None
 
