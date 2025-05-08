@@ -248,11 +248,15 @@ export default function Home() {
 
             {/* Profile JSON Display */}
             {profile && !confirmed && (
-              <div className="bg-white rounded-lg shadow p-6 space-y-4">
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Full Profile Data</h2>
-                <pre className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg overflow-auto max-h-96 text-sm">
-                  {JSON.stringify(profile, null, 2)}
-                </pre>
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 space-y-4">
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Profile Summary</h2>
+                <div className="prose dark:prose-invert max-w-none">
+                  <div className="bg-gray-50 dark:bg-gray-700 p-6 rounded-lg">
+                    <p className="text-gray-800 dark:text-gray-200 whitespace-pre-line leading-relaxed">
+                      {profile.summary}
+                    </p>
+                  </div>
+                </div>
                 <div className="flex space-x-4 pt-4">
                   <button
                     onClick={handleConfirm}
